@@ -14,6 +14,9 @@ class WordSearchGame {
         this.timerInterval = null;
         this.isAudioEnabled = true;
 
+        // Ses Motoru (AudioContext)
+        this.audioCtx = null;
+
         // UI Elementleri
         this.screens = {
             menu: document.getElementById('screen-menu'),
@@ -95,7 +98,66 @@ class WordSearchGame {
 
     toggleAudio() {
         this.isAudioEnabled = !this.isAudioEnabled;
-        document.getElementById('btn-audio').innerText = this.isAudioEnabled ? '🔊' : '🔇';
+        const onIcon = document.getElementById('svg-audio-on');
+        const offIcon = document.getElementById('svg-audio-off');
+        if (onIcon && offIcon) {
+            onIcon.style.display = this.isAudioEnabled ? 'block' : 'none';
+            offIcon.style.display = this.isAudioEnabled ? 'none' : 'block';
+        }
+        if (this.isAudioEnabled) this.initAudioContext();
+    }
+
+    initAudioContext() {
+        if (!this.audioCtx) {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    playSound(type) {
+        if (!this.isAudioEnabled) return;
+        this.initAudioContext();
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
+
+        const oscillator = this.audioCtx.createOscillator();
+        const gainNode = this.audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioCtx.destination);
+
+        const now = this.audioCtx.currentTime;
+
+        if (type === 'click') {
+            // Kısa "tik" sesi
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, now);
+            oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            oscillator.start(now);
+            oscillator.stop(now + 0.1);
+        } else if (type === 'success') {
+            // Yükselen iki tonlu başarı sesi
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(400, now);
+            oscillator.frequency.setValueAtTime(600, now + 0.1);
+            gainNode.gain.setValueAtTime(0.05, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            oscillator.start(now);
+            oscillator.stop(now + 0.3);
+        } else if (type === 'win') {
+            // Kutlama melodisi
+            oscillator.type = 'triangle';
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            notes.forEach((freq, i) => {
+                oscillator.frequency.setValueAtTime(freq, now + (i * 0.1));
+            });
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            oscillator.start(now);
+            oscillator.stop(now + 0.5);
+        }
     }
 
     toggleFullscreen() {
@@ -250,6 +312,7 @@ class WordSearchGame {
             r: parseInt(cell.dataset.row),
             c: parseInt(cell.dataset.col)
         };
+        this.playSound('click');
         this.updateSelection(this.selectionStart);
     }
 
@@ -338,6 +401,9 @@ class WordSearchGame {
         const tag = document.getElementById(`tag-${word}`);
         if (tag) tag.classList.add('found');
 
+        // Ses efektleri
+        this.playSound('success');
+
         // Başarı efekti (Hafif titreşim varsa)
         if (window.navigator.vibrate) window.navigator.vibrate(50);
 
@@ -351,6 +417,7 @@ class WordSearchGame {
         clearInterval(this.timerInterval);
         document.getElementById('final-score').innerText = this.score;
         document.getElementById('final-time').innerText = document.getElementById('timer').innerText;
+        this.playSound('win');
         this.showScreen('result');
     }
 }
